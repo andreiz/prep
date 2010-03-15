@@ -7,6 +7,7 @@
  * - Handle shebang:
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
+ * - allow multiple prep.command INI registrations
  */
 
 #ifdef HAVE_CONFIG_H
