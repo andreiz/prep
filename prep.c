@@ -2,8 +2,8 @@
  * TODO:
  * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
  *   with the compile_file()
- * - Add function to get the filename of the processed file
- *   - Add hashtable mapping original path to temp file
+ * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
+ *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
  * - Handle shebang:
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
@@ -21,7 +21,12 @@
 
 static int le_prep;
 
+ZEND_BEGIN_ARG_INFO(prep_get_file, 0)
+	ZEND_ARG_INFO(0, from_file)
+ZEND_END_ARG_INFO()
+
 const zend_function_entry prep_functions[] = {
+	PHP_FE(prep_get_file, prep_get_file)
 	{NULL, NULL, NULL}	/* Must be the last line in prep_functions[] */
 };
 
@@ -116,6 +121,12 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 		new_file = tmp_stream->orig_path;
 
+		/* add entry to hashtable */
+		if (zend_hash_add(&PREP_G(orig_files), resolved_path, strlen(resolved_path), new_file, strlen(new_file), NULL) == FAILURE) {
+			failed = 1;
+			goto prep_error;
+		}
+
 		if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
 			file_handle->filename = f.filename;
 			if (file_handle->opened_path) {
@@ -203,11 +214,13 @@ PHP_MSHUTDOWN_FUNCTION(prep)
 
 PHP_RINIT_FUNCTION(prep)
 {
+	zend_hash_init(&PREP_G(orig_files), 64, NULL, ZVAL_PTR_DTOR, 0);
 	return SUCCESS;
 }
 
 PHP_RSHUTDOWN_FUNCTION(prep)
 {
+	/* zend_hash_destroy(&PREP_G(orig_files)); */
 	return SUCCESS;
 }
 
@@ -217,4 +230,24 @@ PHP_MINFO_FUNCTION(prep)
 	php_info_print_table_header(2, "prep support", "enabled");
 	php_info_print_table_end();
 
+}
+
+PHP_FUNCTION(prep_get_file)
+{
+	char *from_file, *pData;
+	int from_file_len;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &from_file, &from_file_len) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	if (!zend_hash_exists(&PREP_G(orig_files), from_file, from_file_len)) {
+		RETURN_STRING("noexist", sizeof("noexist"));
+	}
+
+	if (zend_hash_find(&PREP_G(orig_files), from_file, from_file_len, &pData) == FAILURE) {
+		RETURN_STRING("unfound", sizeof("unfound"));
+	}
+
+	RETURN_STRING(pData, strlen(pData));
 }
