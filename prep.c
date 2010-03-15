@@ -36,13 +36,13 @@ ZEND_GET_MODULE(prep)
 
 zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
 
-#define PREP_SCRIPT "/tmp/prep.php"
+#define PREP_SCRIPT "/tmp/prep.ph"
 static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type TSRMLS_DC) /* {{{ */
 {
 	zend_op_array *res;
-	char *resolved_path;
+	char *resolved_path = NULL;
 	zend_file_handle f;
-	int failed;
+	int failed = 0;
 	char *new_file = NULL, *command = NULL;
 	php_stream *tmp_stream = NULL;
 	char *env_suppress = NULL;
@@ -64,32 +64,31 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		php_stream *in_stream;
 
 		spprintf(&command, 0, "%s %s", PREP_SCRIPT, resolved_path);
-		efree(resolved_path);
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Preprocessor failed: %s (%s)", command, strerror(errno));
-			goto orig_compile;
+			failed = 1;
+			goto prep_error;
 		}
 		in_stream = php_stream_fopen_from_pipe(fp, "r");
 
 		if (in_stream == NULL)	{
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Preprocessor failed: %s", strerror(errno));
-			goto orig_compile;
+			failed = 1;
+			goto prep_error;
 		}
 
 		result_len = php_stream_copy_to_mem(in_stream, &result, maxlen, 0);
 		php_stream_close(in_stream);
 		if (!result) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Preprocessor reading failed: %s", strerror(errno));
-			goto orig_compile;
+			failed = 1;
+			goto prep_error;
 		}
 
 		tmp_stream = php_stream_fopen_tmpfile();
 		numbytes = php_stream_write(tmp_stream, result, result_len);
 		efree(result);
 		if (numbytes != result_len) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Only %d of %ld bytes written, possibly out of free disk space", numbytes, result_len);
-			goto orig_compile;
+			failed = 1;
+			goto prep_error;
 		}
 		new_file = tmp_stream->orig_path;
 
@@ -105,7 +104,15 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 	}
 
-orig_compile:
+prep_error:
+	if (failed) {
+		unsetenv("PHP_SUPPRESS_PREP");
+		php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", PREP_SCRIPT, resolved_path);
+	}
+
+	if (resolved_path) {
+		efree(resolved_path);
+	}
 	if (command) {
 		efree(command);
 	}
