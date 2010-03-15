@@ -48,6 +48,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	php_stream *tmp_stream = NULL;
 	char *env_suppress = NULL;
 	char *prep_command = PREP_G(prep_command);
+	int exitstatus;
 
 	env_suppress = getenv("PHP_SUPPRESS_PREP");
 
@@ -81,30 +82,33 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 
 		result_len = php_stream_copy_to_mem(in_stream, &result, maxlen, 0);
-		php_stream_close(in_stream);
+		exitstatus = php_stream_close(in_stream);
 		if (!result) {
 			failed = 1;
 			goto prep_error;
 		}
 
-		tmp_stream = php_stream_fopen_tmpfile();
-		numbytes = php_stream_write(tmp_stream, result, result_len);
-		efree(result);
-		if (numbytes != result_len) {
-			failed = 1;
-			goto prep_error;
-		}
-		new_file = tmp_stream->orig_path;
-
-		if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
-			file_handle->filename = f.filename;
-			if (file_handle->opened_path) {
-				efree(file_handle->opened_path);
+		/* if the pipe exits non-zero, use the original handle */
+		if (0 == exitstatus) {
+			tmp_stream = php_stream_fopen_tmpfile();
+			numbytes = php_stream_write(tmp_stream, result, result_len);
+			efree(result);
+			if (numbytes != result_len) {
+				failed = 1;
+				goto prep_error;
 			}
-			file_handle->opened_path = f.opened_path;
-			file_handle->free_filename = f.free_filename;
-		} else {
-			*file_handle = f;
+			new_file = tmp_stream->orig_path;
+
+			if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
+				file_handle->filename = f.filename;
+				if (file_handle->opened_path) {
+					efree(file_handle->opened_path);
+				}
+				file_handle->opened_path = f.opened_path;
+				file_handle->free_filename = f.free_filename;
+			} else {
+				*file_handle = f;
+			}
 		}
 	}
 
