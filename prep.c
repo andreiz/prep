@@ -7,6 +7,7 @@
  * - Handle shebang:
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
+ * - Handle script-is-a-directory
  */
 
 #ifdef HAVE_CONFIG_H
