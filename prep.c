@@ -242,11 +242,11 @@ PHP_FUNCTION(prep_get_file)
 	}
 
 	if (!zend_hash_exists(&PREP_G(orig_files), from_file, from_file_len)) {
-		RETURN_STRING("noexist", sizeof("noexist"));
+		RETURN_FALSE;
 	}
 
 	if (zend_hash_find(&PREP_G(orig_files), from_file, from_file_len, &pData) == FAILURE) {
-		RETURN_STRING("unfound", sizeof("unfound"));
+		RETURN_FALSE;
 	}
 
 	RETURN_STRING(pData, strlen(pData));
