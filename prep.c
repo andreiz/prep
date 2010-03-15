@@ -5,9 +5,11 @@
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
  * - Check exit status and passthru if it's -1 or whatever
- * - Handle shebang:
+ * - Handle shebang (only in CLI):
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
+ * - Change prep.command to fill in %s with the filename
+ * - Check if the file is actually a directory
  */
 
 #ifdef HAVE_CONFIG_H
@@ -19,8 +21,7 @@
 #include "ext/standard/info.h"
 #include "php_prep.h"
 
-static int le_prep;
-
+/* {{{ Module set-up */
 const zend_function_entry prep_functions[] = {
 	{NULL, NULL, NULL}	/* Must be the last line in prep_functions[] */
 };
@@ -47,6 +48,13 @@ ZEND_DECLARE_MODULE_GLOBALS(prep)
 #ifdef COMPILE_DL_PREP
 ZEND_GET_MODULE(prep)
 #endif
+/* }}} */
+
+/* {{{ INI entries */
+PHP_INI_BEGIN()
+	STD_PHP_INI_ENTRY("prep.command",    "",     PHP_INI_PERDIR,     OnUpdateString,             prep_command,     zend_prep_globals,  prep_globals)
+PHP_INI_END()
+/* }}} */
 
 zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
 
@@ -153,19 +161,13 @@ prep_error:
 }
 /* }}} */
 
-/* {{{ INI entries */
-PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("prep.command",    "",     PHP_INI_PERDIR,     OnUpdateString,             prep_command,     zend_prep_globals,  prep_globals)
-PHP_INI_END()
-/* }}} */
-
-
-static void prep_init_globals(zend_prep_globals *prep_globals_p TSRMLS_DC)
+static void prep_init_globals(zend_prep_globals *prep_globals_p TSRMLS_DC) /* {{{ */
 {
 	PREP_G(prep_command) = NULL;
 }
+/* }}} */
 
-PHP_MINIT_FUNCTION(prep)
+PHP_MINIT_FUNCTION(prep) /* {{{ */
 {
 #ifdef ZTS
 	ts_allocate_id(&prep_globals_id, sizeof(zend_prep_globals), (ts_allocate_ctor) prep_init_globals, NULL);
@@ -180,8 +182,9 @@ PHP_MINIT_FUNCTION(prep)
 
 	return SUCCESS;
 }
+/* }}} */
 
-PHP_MSHUTDOWN_FUNCTION(prep)
+PHP_MSHUTDOWN_FUNCTION(prep) /* {{{ */
 {
 	if (zend_compile_file == prep_compile_file) {
 		zend_compile_file = prep_orig_compile_file;
@@ -191,21 +194,27 @@ PHP_MSHUTDOWN_FUNCTION(prep)
 
 	return SUCCESS;
 }
+/* }}} */
 
-PHP_RINIT_FUNCTION(prep)
+PHP_RINIT_FUNCTION(prep) /* {{{ */
 {
 	return SUCCESS;
 }
+/* }}} */
 
-PHP_RSHUTDOWN_FUNCTION(prep)
+PHP_RSHUTDOWN_FUNCTION(prep) /* {{{ */
 {
 	return SUCCESS;
 }
+/* }}} */
 
-PHP_MINFO_FUNCTION(prep)
+PHP_MINFO_FUNCTION(prep) /* {{{ */
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "prep support", "enabled");
 	php_info_print_table_end();
 
 }
+/* }}} */
+
+/* vim: set fdm=marker: */
