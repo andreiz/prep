@@ -1,3 +1,15 @@
+/**
+ * TODO:
+ * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
+ *   with the compile_file()
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
+ * - Check exit status and passthru if it's -1 or whatever
+ * - Handle shebang:
+ *   - reset CG(start_lineno)
+ *   - do cli_seek_file_begin logic again on processed results
+ */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
