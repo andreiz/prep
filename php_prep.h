@@ -1,6 +1,7 @@
-
 #ifndef PHP_PREP_H
 #define PHP_PREP_H
+
+#define PHP_PREP_VERSION "0.0.1"
 
 extern zend_module_entry prep_module_entry;
 #define phpext_prep_ptr &prep_module_entry

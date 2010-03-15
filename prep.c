@@ -1,6 +1,6 @@
 /**
  * TODO:
- * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
+ * + Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
  *   with the compile_file()
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
@@ -21,29 +21,41 @@
 #include "ext/standard/info.h"
 #include "php_prep.h"
 
+/* {{{ Forward declarations */
+zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
+/* }}} */
+
 /* {{{ Module set-up */
+ZEND_DECLARE_MODULE_GLOBALS(prep)
+
 const zend_function_entry prep_functions[] = {
 	{NULL, NULL, NULL}	/* Must be the last line in prep_functions[] */
 };
 
+static const zend_module_dep prep_module_deps[] = {
+    ZEND_MOD_OPTIONAL("apc")
+    ZEND_MOD_OPTIONAL("xdebug")
+    ZEND_MOD_OPTIONAL("xhprof")
+    {NULL, NULL, NULL}
+};
+
 zend_module_entry prep_module_entry = {
-#if ZEND_MODULE_API_NO >= 20010901
-	STANDARD_MODULE_HEADER,
-#endif
+    STANDARD_MODULE_HEADER_EX, NULL,
+	prep_module_deps,
 	"prep",
 	prep_functions,
 	PHP_MINIT(prep),
 	PHP_MSHUTDOWN(prep),
-	PHP_RINIT(prep),		/* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(prep),	/* Replace with NULL if there's nothing to do at request end */
+	PHP_RINIT(prep),
+	PHP_RSHUTDOWN(prep),
 	PHP_MINFO(prep),
-#if ZEND_MODULE_API_NO >= 20010901
-	"0.1", /* Replace with version number for your extension */
-#endif
-	STANDARD_MODULE_PROPERTIES
+	PHP_PREP_VERSION,
+    PHP_MODULE_GLOBALS(prep),
+	NULL,
+	NULL,
+	NULL,
+	STANDARD_MODULE_PROPERTIES_EX
 };
-
-ZEND_DECLARE_MODULE_GLOBALS(prep)
 
 #ifdef COMPILE_DL_PREP
 ZEND_GET_MODULE(prep)
@@ -55,8 +67,6 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("prep.command",    "",     PHP_INI_PERDIR,     OnUpdateString,             prep_command,     zend_prep_globals,  prep_globals)
 PHP_INI_END()
 /* }}} */
-
-zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
 
 static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type TSRMLS_DC) /* {{{ */
 {
