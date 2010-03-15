@@ -30,13 +30,14 @@ zend_module_entry prep_module_entry = {
 	STANDARD_MODULE_PROPERTIES
 };
 
+ZEND_DECLARE_MODULE_GLOBALS(prep)
+
 #ifdef COMPILE_DL_PREP
 ZEND_GET_MODULE(prep)
 #endif
 
 zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
 
-#define PREP_SCRIPT "/tmp/prep.ph"
 static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type TSRMLS_DC) /* {{{ */
 {
 	zend_op_array *res;
@@ -46,10 +47,13 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	char *new_file = NULL, *command = NULL;
 	php_stream *tmp_stream = NULL;
 	char *env_suppress = NULL;
+	char *prep_command = PREP_G(prep_command);
 
 	env_suppress = getenv("PHP_SUPPRESS_PREP");
 
-	if (env_suppress != NULL || !file_handle || !file_handle->filename) {
+	if (!(prep_command && prep_command[0]) || env_suppress != NULL ||
+		!file_handle || !file_handle->filename) {
+
 		return prep_orig_compile_file(file_handle, type TSRMLS_CC);
 	}
 
@@ -63,7 +67,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		long maxlen = PHP_STREAM_COPY_ALL, result_len;
 		php_stream *in_stream;
 
-		spprintf(&command, 0, "%s %s", PREP_SCRIPT, resolved_path);
+		spprintf(&command, 0, "%s %s", prep_command, resolved_path);
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
@@ -107,7 +111,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 prep_error:
 	if (failed) {
 		unsetenv("PHP_SUPPRESS_PREP");
-		php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", PREP_SCRIPT, resolved_path);
+		php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", prep_command, resolved_path);
 	}
 
 	if (resolved_path) {
@@ -137,8 +141,28 @@ prep_error:
 }
 /* }}} */
 
+/* {{{ INI entries */
+PHP_INI_BEGIN()
+	STD_PHP_INI_ENTRY("prep.command",    "",     PHP_INI_PERDIR,     OnUpdateString,             prep_command,     zend_prep_globals,  prep_globals)
+PHP_INI_END()
+/* }}} */
+
+
+static void prep_init_globals(zend_prep_globals *prep_globals_p TSRMLS_DC)
+{
+	PREP_G(prep_command) = NULL;
+}
+
 PHP_MINIT_FUNCTION(prep)
 {
+#ifdef ZTS
+	ts_allocate_id(&prep_globals_id, sizeof(zend_prep_globals), (ts_allocate_ctor) prep_init_globals, NULL);
+#else
+	prep_init_globals(&prep_globals TSRMLS_CC);
+#endif
+
+	REGISTER_INI_ENTRIES();
+
 	prep_orig_compile_file = zend_compile_file;
 	zend_compile_file = prep_compile_file;
 
@@ -150,6 +174,8 @@ PHP_MSHUTDOWN_FUNCTION(prep)
 	if (zend_compile_file == prep_compile_file) {
 		zend_compile_file = prep_orig_compile_file;
 	}
+
+	UNREGISTER_INI_ENTRIES();
 
 	return SUCCESS;
 }

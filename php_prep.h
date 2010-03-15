@@ -17,6 +17,10 @@ extern zend_module_entry prep_module_entry;
 #include "TSRM.h"
 #endif
 
+ZEND_BEGIN_MODULE_GLOBALS(prep)
+	char *prep_command;
+ZEND_END_MODULE_GLOBALS(prep)
+
 PHP_MINIT_FUNCTION(prep);
 PHP_MSHUTDOWN_FUNCTION(prep);
 PHP_RINIT_FUNCTION(prep);
