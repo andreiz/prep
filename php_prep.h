@@ -20,6 +20,7 @@ extern zend_module_entry prep_module_entry;
 
 ZEND_BEGIN_MODULE_GLOBALS(prep)
 	char *prep_command;
+	HashTable orig_files;
 ZEND_END_MODULE_GLOBALS(prep)
 
 PHP_MINIT_FUNCTION(prep);
@@ -28,6 +29,7 @@ PHP_RINIT_FUNCTION(prep);
 PHP_RSHUTDOWN_FUNCTION(prep);
 PHP_MINFO_FUNCTION(prep);
 
+PHP_FUNCTION(prep_get_file);
 
 #ifdef ZTS
 #define PREP_G(v) TSRMG(prep_globals_id, zend_prep_globals *, v)

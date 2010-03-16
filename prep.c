@@ -2,10 +2,18 @@
  * TODO:
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
- * - Check exit status and passthru if it's -1 or whatever
+ * - Check exit status of preprocessor command:
+ *   - If 255, capture error and raise as E_COMPILE_ERROR
+ *   - If 1, use the original file
  * - Check if the file is actually a directory
- * -? Change prep.command to fill in %s with the filename
- * -? What should it do if the prep.command script had a syntax error or something?
+ * - Change prep.command to fill in %s with the filename
+ *   - If %s is not in the string, add filename at the end
+ *   - Check return of spprintf() to see if it succeeded
+ * 
+ * FIXME:
+ * - require script (absolute path)?
+ * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
+ *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
  *
  * DONE:
  * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
@@ -13,6 +21,7 @@
  * - Handle shebang (only in CLI):
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
+ * - allow multiple prep.command INI registrations
  */
 
 #ifdef HAVE_CONFIG_H
@@ -34,7 +43,12 @@ zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type
 /* {{{ Module set-up */
 ZEND_DECLARE_MODULE_GLOBALS(prep)
 
+ZEND_BEGIN_ARG_INFO(prep_get_file, 0)
+	ZEND_ARG_INFO(0, from_file)
+ZEND_END_ARG_INFO()
+
 const zend_function_entry prep_functions[] = {
+	PHP_FE(prep_get_file, prep_get_file)
 	{NULL, NULL, NULL}	/* Must be the last line in prep_functions[] */
 };
 
@@ -104,7 +118,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		long maxlen = PHP_STREAM_COPY_ALL, result_len;
 		php_stream *in_stream;
 		long offset = 0;
-		int prep_exit_status = 0;
+		int exit_status = 0;
 
 		spprintf(&command, 0, "%s %s", prep_command, resolved_path);
 		fp = VCWD_POPEN(command, "r");
@@ -120,15 +134,15 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 
 		result_len = php_stream_copy_to_mem(in_stream, &result, maxlen, 0);
-		prep_exit_status = php_stream_close(in_stream);
+		exit_status = php_stream_close(in_stream);
 
-		/* TODO Should exit code 255 print received error and skip compilation?? */
-		if (prep_exit_status == PREP_EXIT_SKIP) {
+		if (exit_status == PREP_EXIT_SKIP) {
 			goto skip_prep;
 		}
 		if (!result) {
-			failed = 1;
-			goto skip_prep;
+			/* could not read file (e.g. might be a directory);
+			 * skip preprocessing */
+			goto prep_compile;
 		}
 
 		/* eat up shebang in CLI mode */
@@ -156,7 +170,14 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 			failed = 1;
 			goto skip_prep;
 		}
-		new_file = tmp_stream->orig_path;
+		new_file = estrdup(tmp_stream->orig_path);
+
+		/* add entry to hashtable */
+		if (zend_hash_add(&PREP_G(orig_files), resolved_path, strlen(resolved_path),
+						  (void*)&new_file, sizeof(char *), NULL) == FAILURE) {
+			failed = 1;
+			goto skip_prep;
+		}
 
 		if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
 			file_handle->filename = f.filename;
@@ -187,6 +208,7 @@ skip_prep:
 		efree(command);
 	}
 
+prep_compile:
 	zend_try {
 		failed = 0;
 		res = prep_orig_compile_file(file_handle, type TSRMLS_CC);
@@ -240,12 +262,14 @@ PHP_MSHUTDOWN_FUNCTION(prep) /* {{{ */
 
 PHP_RINIT_FUNCTION(prep) /* {{{ */
 {
+	zend_hash_init(&PREP_G(orig_files), 64, NULL, (dtor_func_t)free_estring, 0);
 	return SUCCESS;
 }
 /* }}} */
 
 PHP_RSHUTDOWN_FUNCTION(prep) /* {{{ */
 {
+	zend_hash_destroy(&PREP_G(orig_files));
 	return SUCCESS;
 }
 /* }}} */
@@ -258,5 +282,25 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 
 }
 /* }}} */
+
+PHP_FUNCTION(prep_get_file)
+{
+	char *from_file, *pData;
+	int from_file_len;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &from_file, &from_file_len) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	if (!zend_hash_exists(&PREP_G(orig_files), from_file, from_file_len)) {
+		RETURN_FALSE;
+	}
+
+	if (zend_hash_find(&PREP_G(orig_files), from_file, from_file_len, (void**)&pData) == FAILURE) {
+		RETURN_FALSE;
+	}
+
+	RETURN_STRING(pData, strlen(pData));
+}
 
 /* vim: set fdm=marker: */
