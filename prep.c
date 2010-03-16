@@ -3,8 +3,9 @@
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
  * - Check exit status and passthru if it's -1 or whatever
- * -? Change prep.command to fill in %s with the filename
  * - Check if the file is actually a directory
+ * -? Change prep.command to fill in %s with the filename
+ * -? What should it do if the prep.command script had a syntax error or something?
  *
  * DONE:
  * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
@@ -23,6 +24,8 @@
 #include "ext/standard/info.h"
 #include "SAPI.h"
 #include "php_prep.h"
+
+#define PREP_EXIT_SKIP 0x1
 
 /* {{{ Forward declarations */
 zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
@@ -97,29 +100,35 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	if (resolved_path) {
 		FILE *fp;
 		char *result = NULL;
-		int numbytes = 0;
+		int num_written = 0;
 		long maxlen = PHP_STREAM_COPY_ALL, result_len;
 		php_stream *in_stream;
 		long offset = 0;
+		int prep_exit_status = 0;
 
 		spprintf(&command, 0, "%s %s", prep_command, resolved_path);
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
-			goto prep_error;
+			goto skip_prep;
 		}
 		in_stream = php_stream_fopen_from_pipe(fp, "r");
 
 		if (in_stream == NULL)	{
 			failed = 1;
-			goto prep_error;
+			goto skip_prep;
 		}
 
 		result_len = php_stream_copy_to_mem(in_stream, &result, maxlen, 0);
-		php_stream_close(in_stream);
+		prep_exit_status = php_stream_close(in_stream);
+
+		/* TODO Should exit code 255 print received error and skip compilation?? */
+		if (prep_exit_status == PREP_EXIT_SKIP) {
+			goto skip_prep;
+		}
 		if (!result) {
 			failed = 1;
-			goto prep_error;
+			goto skip_prep;
 		}
 
 		/* eat up shebang in CLI mode */
@@ -141,11 +150,11 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 
 		tmp_stream = php_stream_fopen_tmpfile();
-		numbytes = php_stream_write(tmp_stream, result+offset, result_len-offset);
+		num_written = php_stream_write(tmp_stream, result+offset, result_len-offset);
 		efree(result);
-		if (numbytes != result_len-offset) {
+		if (num_written != result_len-offset) {
 			failed = 1;
-			goto prep_error;
+			goto skip_prep;
 		}
 		new_file = tmp_stream->orig_path;
 
@@ -161,7 +170,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 	}
 
-prep_error:
+skip_prep:
 	if (tmp_stream) {
 		php_stream_close(tmp_stream);
 	}
