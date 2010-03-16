@@ -1,15 +1,17 @@
 /**
  * TODO:
- * + Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
- *   with the compile_file()
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
  * - Check exit status and passthru if it's -1 or whatever
+ * -? Change prep.command to fill in %s with the filename
+ * - Check if the file is actually a directory
+ *
+ * DONE:
+ * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
+ *   with the compile_file()
  * - Handle shebang (only in CLI):
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
- * - Change prep.command to fill in %s with the filename
- * - Check if the file is actually a directory
  */
 
 #ifdef HAVE_CONFIG_H
@@ -19,6 +21,7 @@
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
+#include "SAPI.h"
 #include "php_prep.h"
 
 /* {{{ Forward declarations */
@@ -81,7 +84,8 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 
 	env_suppress = getenv("PHP_SUPPRESS_PREP");
 
-	if (!(prep_command && prep_command[0]) || env_suppress != NULL ||
+	if (!(prep_command && prep_command[0]) ||
+		env_suppress != NULL ||
 		!file_handle || !file_handle->filename) {
 
 		return prep_orig_compile_file(file_handle, type TSRMLS_CC);
@@ -96,6 +100,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		int numbytes = 0;
 		long maxlen = PHP_STREAM_COPY_ALL, result_len;
 		php_stream *in_stream;
+		long offset = 0;
 
 		spprintf(&command, 0, "%s %s", prep_command, resolved_path);
 		fp = VCWD_POPEN(command, "r");
@@ -117,10 +122,28 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 			goto prep_error;
 		}
 
+		/* eat up shebang in CLI mode */
+		if (!strcmp(sapi_module.name, "cli")) {
+			char *ptr = result;
+
+			CG(start_lineno) = 1;
+			if (*ptr == '#' && *++ptr == '!') {
+				do {
+					ptr++;
+				} while (*ptr != '\n' && *ptr != '\r' && *ptr != 0);
+
+				/* handle situations where line is terminated by \r\n */
+				if (*ptr++ == '\r' && *ptr++ != '\n') {
+					ptr--;
+				}
+				offset = ptr-result;
+			}
+		}
+
 		tmp_stream = php_stream_fopen_tmpfile();
-		numbytes = php_stream_write(tmp_stream, result, result_len);
+		numbytes = php_stream_write(tmp_stream, result+offset, result_len-offset);
 		efree(result);
-		if (numbytes != result_len) {
+		if (numbytes != result_len-offset) {
 			failed = 1;
 			goto prep_error;
 		}
@@ -139,6 +162,10 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	}
 
 prep_error:
+	if (tmp_stream) {
+		php_stream_close(tmp_stream);
+	}
+
 	if (failed) {
 		unsetenv("PHP_SUPPRESS_PREP");
 		php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", prep_command, resolved_path);
@@ -160,10 +187,6 @@ prep_error:
 
 	if (failed) {
 		zend_bailout();
-	}
-
-	if (tmp_stream) {
-		php_stream_close(tmp_stream);
 	}
 
 	unsetenv("PHP_SUPPRESS_PREP");
