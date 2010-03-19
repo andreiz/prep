@@ -34,7 +34,8 @@
 #include "SAPI.h"
 #include "php_prep.h"
 
-#define PREP_EXIT_SKIP 0x1
+#define PREP_EXIT_SKIP     1
+#define PREP_EXIT_PHP_FALE 255
 
 /* {{{ Forward declarations */
 zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type TSRMLS_DC);
@@ -96,6 +97,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	int failed = 0;
 	char *new_file = NULL, *command = NULL;
 	php_stream *tmp_stream = NULL;
+	char *err_extra = NULL;
 	char *env_suppress = NULL;
 	char *prep_command = PREP_G(prep_command);
 
@@ -124,25 +126,33 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
-			goto skip_prep;
+			goto prep_skip;
 		}
 		in_stream = php_stream_fopen_from_pipe(fp, "r");
 
 		if (in_stream == NULL)	{
 			failed = 1;
-			goto skip_prep;
+			goto prep_skip;
 		}
 
 		result_len = php_stream_copy_to_mem(in_stream, &result, maxlen, 0);
 		exit_status = php_stream_close(in_stream);
 
-		if (exit_status == PREP_EXIT_SKIP) {
-			goto skip_prep;
-		}
 		if (!result) {
 			/* could not read file (e.g. might be a directory);
 			 * skip preprocessing */
-			goto prep_compile;
+			goto prep_skip;
+		}
+
+		if (PREP_EXIT_PHP_FALE == exit_status) {
+			failed = 1;
+			err_extra = result;
+			goto prep_skip;
+		} else if (PREP_EXIT_SKIP == exit_status) {
+			if (result) {
+				efree(result);
+			}
+			goto prep_skip;
 		}
 
 		/* eat up shebang in CLI mode */
@@ -168,7 +178,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		efree(result);
 		if (num_written != result_len-offset) {
 			failed = 1;
-			goto skip_prep;
+			goto prep_skip;
 		}
 		new_file = estrdup(tmp_stream->orig_path);
 
@@ -176,7 +186,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		if (zend_hash_add(&PREP_G(orig_files), resolved_path, strlen(resolved_path),
 						  (void*)&new_file, sizeof(char *), NULL) == FAILURE) {
 			failed = 1;
-			goto skip_prep;
+			goto prep_skip;
 		}
 
 		if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
@@ -191,14 +201,19 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		}
 	}
 
-skip_prep:
+prep_skip:
 	if (tmp_stream) {
 		php_stream_close(tmp_stream);
 	}
 
 	if (failed) {
 		unsetenv("PHP_SUPPRESS_PREP");
-		php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", prep_command, resolved_path);
+		if (err_extra) {
+			php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s: %s", prep_command, resolved_path, err_extra);
+			efree(err_extra);
+		} else {
+			php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor %s on %s", prep_command, resolved_path);
+		}
 	}
 
 	if (resolved_path) {
@@ -208,7 +223,6 @@ skip_prep:
 		efree(command);
 	}
 
-prep_compile:
 	zend_try {
 		failed = 0;
 		res = prep_orig_compile_file(file_handle, type TSRMLS_CC);
