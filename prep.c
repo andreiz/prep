@@ -297,6 +297,7 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 }
 /* }}} */
 
+/* {{{ proto string prep_get_file(string source_file) */
 PHP_FUNCTION(prep_get_file)
 {
 	char *from_file, *pData;
@@ -316,5 +317,5 @@ PHP_FUNCTION(prep_get_file)
 
 	RETURN_STRING(pData, strlen(pData));
 }
-
+/* }}} */
 /* vim: set fdm=marker: */
