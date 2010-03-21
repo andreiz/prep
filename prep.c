@@ -1,12 +1,6 @@
 /**
  * TODO:
- * - Add function to get the filename of the processed file
- *   - Add hashtable mapping original path to temp file
- * - Check exit status of preprocessor command:
- *   - If 255, capture error and raise as E_COMPILE_ERROR
- *   - If 1, use the original file
- * - Check if the file is actually a directory
- * - Change prep.command to fill in %s with the filename
+* - Change prep.command to fill in %s with the filename
  *   - If %s is not in the string, add filename at the end
  *   - Check return of spprintf() to see if it succeeded
  * 
@@ -22,6 +16,12 @@
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
  * - allow multiple prep.command INI registrations
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
+ * - Check exit status of preprocessor command:
+ *   - If 255, capture error and raise as E_COMPILE_ERROR
+ *   - If 1, use the original file
+ * - Check if the file is actually a directory
  */
 
 #ifdef HAVE_CONFIG_H
