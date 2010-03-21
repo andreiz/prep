@@ -1,8 +1,14 @@
 /**
  * TODO:
-* - Change prep.command to fill in %s with the filename
- *   - If %s is not in the string, add filename at the end
- *   - Check return of spprintf() to see if it succeeded
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
+ * - Check if the file is actually a directory
+ * - Change prep.command to be a formattable string:
+ *   - %s: source, %o: original
+ *   - error out if %s is not found
+ * - Allow multiple prep.command INI registrations
+ *   - result of one command feeds back into the same tempfile for the next
+ *     (if there's > 1)
  * 
  * FIXME:
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
@@ -14,7 +20,6 @@
  * - Handle shebang (only in CLI):
  *   - reset CG(start_lineno)
  *   - do cli_seek_file_begin logic again on processed results
- * - allow multiple prep.command INI registrations
  * - Add function to get the filename of the processed file
  *   - Add hashtable mapping original path to temp file
  * - Check exit status of preprocessor command:
@@ -31,6 +36,7 @@
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
+#include "ext/standard/php_string.h"
 #include "SAPI.h"
 #include "php_prep.h"
 
@@ -122,9 +128,11 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		php_stream *in_stream;
 		long offset = 0;
 		int exit_status = 0;
+		int command_len;
+		int replace_count = 0;
 
-
-		spprintf(&command, 0, "%s %s", prep_command, real_path);
+		command = php_str_to_str_ex(prep_command, strlen(prep_command), "%s", sizeof("%s")-1,
+								 resolved_path, strlen(resolved_path), &command_len, 0, &replace_count);
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
@@ -302,7 +310,6 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 }
 /* }}} */
 
-/* {{{ proto string prep_get_file(string source_file) */
 PHP_FUNCTION(prep_get_file)
 {
 	char *from_file, *pData;
@@ -322,5 +329,5 @@ PHP_FUNCTION(prep_get_file)
 
 	RETURN_STRING(pData, strlen(pData));
 }
-/* }}} */
+
 /* vim: set fdm=marker: */
