@@ -5,7 +5,6 @@
  *   - Check return of spprintf() to see if it succeeded
  * 
  * FIXME:
- * - require script (absolute path)?
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
  *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
  *
@@ -22,6 +21,7 @@
  *   - If 255, capture error and raise as E_COMPILE_ERROR
  *   - If 1, use the original file
  * - Check if the file is actually a directory
+ * - FIXED require script (absolute path) (resolve realpath)
  */
 
 #ifdef HAVE_CONFIG_H
@@ -93,6 +93,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 {
 	zend_op_array *res;
 	char *resolved_path = NULL;
+	char *real_path = NULL;
 	zend_file_handle f;
 	int failed = 0;
 	char *new_file = NULL, *command = NULL;
@@ -113,7 +114,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	putenv("PHP_SUPPRESS_PREP=1");
 	f = *file_handle;
 	resolved_path = zend_resolve_path(file_handle->filename, strlen(file_handle->filename) TSRMLS_CC);
-	if (resolved_path) {
+	if (resolved_path && tsrm_realpath(resolved_path, real_path TSRMLS_CC)) {
 		FILE *fp;
 		char *result = NULL;
 		int num_written = 0;
@@ -122,7 +123,8 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		long offset = 0;
 		int exit_status = 0;
 
-		spprintf(&command, 0, "%s %s", prep_command, resolved_path);
+
+		spprintf(&command, 0, "%s %s", prep_command, real_path);
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
@@ -183,7 +185,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		new_file = estrdup(tmp_stream->orig_path);
 
 		/* add entry to hashtable */
-		if (zend_hash_add(&PREP_G(orig_files), resolved_path, strlen(resolved_path),
+		if (zend_hash_add(&PREP_G(orig_files), real_path, strlen(real_path),
 						  (void*)&new_file, sizeof(char *), NULL) == FAILURE) {
 			failed = 1;
 			goto prep_skip;
@@ -194,7 +196,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 			if (file_handle->opened_path) {
 				efree(file_handle->opened_path);
 			}
-			file_handle->opened_path = f.opened_path;
+			file_handle->opened_path = real_path;
 			file_handle->free_filename = f.free_filename;
 		} else {
 			*file_handle = f;
@@ -218,6 +220,9 @@ prep_skip:
 
 	if (resolved_path) {
 		efree(resolved_path);
+	}
+	if (real_path) {
+		efree(real_path);
 	}
 	if (command) {
 		efree(command);
