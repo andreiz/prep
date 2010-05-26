@@ -1,0 +1,31 @@
+/**
+ * TODO:
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
+ * - Check if the file is actually a directory
+ * - Change prep.command to be a formattable string:
+ *   - %s: source, %o: original
+ *   - error out if %s is not found
+ * - Allow multiple prep.command INI registrations
+ *   - result of one command feeds back into the same tempfile for the next
+ *     (if there's > 1)
+ * 
+ * FIXME:
+ * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
+ *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
+ *
+ * DONE:
+ * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
+ *   with the compile_file()
+ * - Handle shebang (only in CLI):
+ *   - reset CG(start_lineno)
+ *   - do cli_seek_file_begin logic again on processed results
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
+ * - Check exit status of preprocessor command:
+ *   - If 255, capture error and raise as E_COMPILE_ERROR
+ *   - If 1, use the original file
+ * - Check if the file is actually a directory
+ * - FIXED require script (absolute path) (resolve realpath)
+ */
+
