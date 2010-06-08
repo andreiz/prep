@@ -59,6 +59,27 @@ ZEND_GET_MODULE(prep)
 /* }}} */
 
 /* {{{ INI entries */
+static PHP_INI_MH(OnUpdateCommand)
+{
+	char **p;
+#ifndef ZTS
+	char *base = (char *) mh_arg2;
+#else
+	char *base;
+
+	base = (char *) ts_resource(*((int *) mh_arg2));
+#endif
+
+	if (new_value && !new_value[0]) {
+		return FAILURE;
+	}
+
+	p = (char **) (base+(size_t) mh_arg1);
+
+	*p = new_value;
+	return SUCCESS;
+}
+
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("prep.command", "", PHP_INI_PERDIR, OnUpdateString, prep_command, zend_prep_globals, prep_globals)
 PHP_INI_END()
@@ -74,7 +95,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	php_stream *tmp_stream = NULL;
 	char *err_extra = NULL;
 	char *env_suppress = NULL;
-	char *prep_command = PREP_G(prep_command);
+	char *prep_command;
 
 	env_suppress = getenv("PHP_SUPPRESS_PREP");
 
@@ -103,8 +124,10 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 									resolved_path, strlen(resolved_path), &command_len, 0, &replace_count);
 		if (replace_count > 0) {
 			char *tmp = command;
+			/* XXX modify to use temp file in chain */
 			command = php_str_to_str_ex(tmp, command_len, "%o", sizeof("%o")-1,
 										resolved_path, strlen(resolved_path), &command_len, 0, NULL);
+			efree(tmp);
 		} else {
 			efree(command);
 			command = NULL;
@@ -237,14 +260,20 @@ prep_skip:
 
 static void prep_init_globals(zend_prep_globals *prep_globals_p TSRMLS_DC) /* {{{ */
 {
-	PREP_G(prep_command) = NULL;
+	zend_hash_init(&PREP_G(commands), 1, NULL, (dtor_func_t)free, 1);
+}
+/* }}} */
+
+static void prep_destroy_globals(zend_prep_globals *prep_globals_p TSRMLS_DC) /* {{{ */
+{
+	zend_hash_destroy(&PREP_G(commands));
 }
 /* }}} */
 
 PHP_MINIT_FUNCTION(prep) /* {{{ */
 {
 #ifdef ZTS
-	ts_allocate_id(&prep_globals_id, sizeof(zend_prep_globals), (ts_allocate_ctor) prep_init_globals, NULL);
+	ts_allocate_id(&prep_globals_id, sizeof(zend_prep_globals), (ts_allocate_ctor) prep_init_globals, (ts_allocate_dtor) prep_destroy_globals);
 #else
 	prep_init_globals(&prep_globals TSRMLS_CC);
 #endif
@@ -265,6 +294,10 @@ PHP_MSHUTDOWN_FUNCTION(prep) /* {{{ */
 	}
 
 	UNREGISTER_INI_ENTRIES();
+
+#ifndef ZTS
+	prep_destroy_globals(&prep_globals TSRMLS_CC);
+#endif
 
 	return SUCCESS;
 }

@@ -19,7 +19,7 @@ extern zend_module_entry prep_module_entry;
 #endif
 
 ZEND_BEGIN_MODULE_GLOBALS(prep)
-	char *prep_command;
+	HashTable commands;
 	HashTable orig_files;
 ZEND_END_MODULE_GLOBALS(prep)
 
