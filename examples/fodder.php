@@ -10,3 +10,4 @@ for ($i=1; $i<=10; $i++) {
 	/*<remove:*/DOSTUFF();/*:remove>*/
 }
 
+include "fodder1.php";

@@ -1,34 +1,3 @@
-/**
- * TODO:
- * - Add function to get the filename of the processed file
- *   - Add hashtable mapping original path to temp file
- * - Check if the file is actually a directory
- * - Change prep.command to be a formattable string:
- *   - %s: source, %o: original
- *   - error out if %s is not found
- * - Allow multiple prep.command INI registrations
- *   - result of one command feeds back into the same tempfile for the next
- *     (if there's > 1)
- * 
- * FIXME:
- * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
- *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
- *
- * DONE:
- * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
- *   with the compile_file()
- * - Handle shebang (only in CLI):
- *   - reset CG(start_lineno)
- *   - do cli_seek_file_begin logic again on processed results
- * - Add function to get the filename of the processed file
- *   - Add hashtable mapping original path to temp file
- * - Check exit status of preprocessor command:
- *   - If 255, capture error and raise as E_COMPILE_ERROR
- *   - If 1, use the original file
- * - Check if the file is actually a directory
- * - FIXED require script (absolute path) (resolve realpath)
- */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -99,7 +68,6 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 {
 	zend_op_array *res;
 	char *resolved_path = NULL;
-	char *real_path = NULL;
 	zend_file_handle f;
 	int failed = 0;
 	char *new_file = NULL, *command = NULL;
@@ -120,7 +88,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 	putenv("PHP_SUPPRESS_PREP=1");
 	f = *file_handle;
 	resolved_path = zend_resolve_path(file_handle->filename, strlen(file_handle->filename) TSRMLS_CC);
-	if (resolved_path && tsrm_realpath(resolved_path, real_path TSRMLS_CC)) {
+	if (resolved_path) {
 		FILE *fp;
 		char *result = NULL;
 		int num_written = 0;
@@ -132,7 +100,17 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		int replace_count = 0;
 
 		command = php_str_to_str_ex(prep_command, strlen(prep_command), "%s", sizeof("%s")-1,
-								 resolved_path, strlen(resolved_path), &command_len, 0, &replace_count);
+									resolved_path, strlen(resolved_path), &command_len, 0, &replace_count);
+		if (replace_count > 0) {
+			char *tmp = command;
+			command = php_str_to_str_ex(tmp, command_len, "%o", sizeof("%o")-1,
+										resolved_path, strlen(resolved_path), &command_len, 0, NULL);
+		} else {
+			efree(command);
+			command = NULL;
+			spprintf(&command, 0, "%s %s", prep_command, resolved_path);
+		}
+
 		fp = VCWD_POPEN(command, "r");
 		if (!fp) {
 			failed = 1;
@@ -193,19 +171,24 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		new_file = estrdup(tmp_stream->orig_path);
 
 		/* add entry to hashtable */
+		/* XXX
 		if (zend_hash_add(&PREP_G(orig_files), real_path, strlen(real_path),
 						  (void*)&new_file, sizeof(char *), NULL) == FAILURE) {
 			failed = 1;
 			goto prep_skip;
 		}
+		*/
 
 		if (SUCCESS == zend_stream_open_function((const char *)new_file, file_handle TSRMLS_CC)) {
 			file_handle->filename = f.filename;
 			if (file_handle->opened_path) {
 				efree(file_handle->opened_path);
 			}
-			file_handle->opened_path = real_path;
+			file_handle->opened_path = estrdup(resolved_path);
 			file_handle->free_filename = f.free_filename;
+			if (f.opened_path) {
+				efree(f.opened_path);
+			}
 		} else {
 			*file_handle = f;
 		}
@@ -226,11 +209,11 @@ prep_skip:
 		}
 	}
 
+	if (new_file) {
+		efree(new_file);
+	}
 	if (resolved_path) {
 		efree(resolved_path);
-	}
-	if (real_path) {
-		efree(real_path);
 	}
 	if (command) {
 		efree(command);
