@@ -1,5 +1,8 @@
 #!/usr/bin/env php
 <?php
+/**
+ * @see snowman.php
+ */
 if (isset($argv[1])) {
 	$source = $argv[1];
 } else {
