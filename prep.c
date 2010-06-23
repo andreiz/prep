@@ -9,7 +9,7 @@
 #include "SAPI.h"
 #include "php_prep.h"
 
-#define PREP_EXIT_SKIP     1
+#define PREP_EXIT_SKIP 1
 #define PREP_EXIT_PHP_FALE 255
 
 /* {{{ Forward declarations */
@@ -29,14 +29,14 @@ const zend_function_entry prep_functions[] = {
 };
 
 static const zend_module_dep prep_module_deps[] = {
-    ZEND_MOD_OPTIONAL("apc")
-    ZEND_MOD_OPTIONAL("xdebug")
-    ZEND_MOD_OPTIONAL("xhprof")
-    {NULL, NULL, NULL}
+	ZEND_MOD_OPTIONAL("apc")
+	ZEND_MOD_OPTIONAL("xdebug")
+	ZEND_MOD_OPTIONAL("xhprof")
+	{NULL, NULL, NULL}
 };
 
 zend_module_entry prep_module_entry = {
-    STANDARD_MODULE_HEADER_EX, NULL,
+	STANDARD_MODULE_HEADER_EX, NULL,
 	prep_module_deps,
 	"prep",
 	prep_functions,
@@ -46,7 +46,7 @@ zend_module_entry prep_module_entry = {
 	PHP_RSHUTDOWN(prep),
 	PHP_MINFO(prep),
 	PHP_PREP_VERSION,
-    PHP_MODULE_GLOBALS(prep),
+	PHP_MODULE_GLOBALS(prep),
 	NULL,
 	NULL,
 	NULL,
@@ -60,7 +60,7 @@ ZEND_GET_MODULE(prep)
 
 /* {{{ INI entries */
 PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("prep.command",    "",     PHP_INI_PERDIR,     OnUpdateString,             prep_command,     zend_prep_globals,  prep_globals)
+	STD_PHP_INI_ENTRY("prep.command", "", PHP_INI_PERDIR, OnUpdateString, prep_command, zend_prep_globals, prep_globals)
 PHP_INI_END()
 /* }}} */
 
