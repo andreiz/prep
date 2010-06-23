@@ -1,5 +1,9 @@
 #!/usr/bin/env php
 <?php
+/**
+ * @see slowfunc.php
+ */
+
 $tokens = token_get_all(file_get_contents($argv[1]));
 
 $max = count($tokens);
