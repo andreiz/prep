@@ -4,3 +4,4 @@ TMPFILE=.prep_multi_output
 DIR=`dirname $0`
 ${DIR}/foo.php $1 > $TMPFILE
 ${DIR}/bar.php $TMPFILE
+rm $TMPFILE
