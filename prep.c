@@ -164,6 +164,9 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 				break;
 			}
 
+			/* TODO
+			 * exit on other exit codes?
+			 */
 			if (PREP_EXIT_PHP_FALE == exit_status) {
 				failed = 1;
 				err_extra = output;
