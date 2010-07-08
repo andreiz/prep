@@ -6,15 +6,15 @@
  * - Change prep.command to be a formattable string:
  *   - %s: source, %o: original
  *   - error out if %s is not found
- * - Allow multiple prep.command INI registrations
- *   - result of one command feeds back into the same tempfile for the next
- *     (if there's > 1)
  * 
  * FIXME:
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
  *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
  *
  * DONE:
+ * - Allow multiple prep.command INI registrations
+ *   - result of one command feeds back into the same tempfile for the next
+ *     (if there's > 1)
  * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
  *   with the compile_file()
  * - Handle shebang (only in CLI):
