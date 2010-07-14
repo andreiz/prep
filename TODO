@@ -1,7 +1,5 @@
 /**
  * TODO:
- * - Add function to get the filename of the processed file
- *   - Add hashtable mapping original path to temp file
  * - Check if the file is actually a directory
  * - Change prep.command to be a formattable string:
  *   - %s: source, %o: original
@@ -14,6 +12,8 @@
  *   - (to keep the file from auto-deleting, so scripts can introspect/debug)
  *
  * DONE:
+ * - Add function to get the filename of the processed file
+ *   - Add hashtable mapping original path to temp file
  * - Allow multiple prep.command INI registrations
  *   - result of one command feeds back into the same tempfile for the next
  *     (if there's > 1)

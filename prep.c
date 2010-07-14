@@ -9,7 +9,8 @@
 #include "SAPI.h"
 #include "php_prep.h"
 
-#define PREP_EXIT_SKIP 1
+#define PREP_EXIT_NORMAL     0
+#define PREP_EXIT_SKIP       1
 #define PREP_EXIT_PHP_FALE 255
 
 /* {{{ Forward declarations */
@@ -159,25 +160,28 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 			output_len = php_stream_copy_to_mem(in_stream, &output, maxlen, 0);
 			exit_status = php_stream_close(in_stream);
 
-			if (!output) {
-				/* could not read file (e.g. might be a directory);
-				* skip preprocessing */
-				break;
-			}
-
-			/* TODO
-			 * exit on other exit codes?
-			 */
 			if (PREP_EXIT_PHP_FALE == exit_status) {
 				failed = 1;
-				err_extra = output;
+				if (output) {
+					err_extra = output;
+				}
 				break;
 			} else if (PREP_EXIT_SKIP == exit_status) {
 				if (output) {
 					efree(output);
 				}
 				break;
+			} else if (PREP_EXIT_NORMAL != exit_status) {
+				failed = 1;
+				break;
 			}
+
+			if (!output) {
+				/* could not read file (e.g. might be a directory);
+				 * skip preprocessing */
+				break;
+			}
+
 
 			/* eat up shebang in CLI mode */
 			if (!strcmp(sapi_module.name, "cli")) {
@@ -223,10 +227,10 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		if (failed) {
 			unsetenv("PHP_SUPPRESS_PREP");
 			if (err_extra) {
-				php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor command %s: %s", command, err_extra);
+				php_error(E_COMPILE_ERROR, "Could not run preprocessor command %s: %s", command, err_extra);
 				efree(err_extra);
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor command %s", command);
+				php_error(E_COMPILE_ERROR, "Could not run preprocessor command %s (exit status %d)", command, exit_status);
 			}
 		} else {
 			if (output_file) {
