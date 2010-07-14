@@ -6,6 +6,7 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
+#include "ext/standard/exec.h"
 #include "SAPI.h"
 #include "php_prep.h"
 
@@ -88,7 +89,6 @@ PHP_INI_BEGIN()
 PHP_INI_END()
 /* }}} */
 
-
 static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type TSRMLS_DC) /* {{{ */
 {
 	zend_op_array *res;
@@ -125,7 +125,7 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		int command_len;
 		int replace_count = 0;
 
-		input_file = estrdup(resolved_path);
+		input_file = php_escape_shell_arg(resolved_path);
 		zend_hash_internal_pointer_reset(commands);
 		while (zend_hash_get_current_data(commands, (void **)&prep_command) == SUCCESS) {
 
@@ -356,6 +356,7 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 }
 /* }}} */
 
+/* {{{ PHP_FUNCTION(prep_get_file) */
 static int add_temp_file(char **ptf TSRMLS_DC, int num_args, va_list args, zend_hash_key *hash_key)
 {
 	zval *map = va_arg(args, zval *);
@@ -386,5 +387,6 @@ PHP_FUNCTION(prep_get_file)
 		zend_hash_apply_with_arguments(&PREP_G(orig_files) TSRMLS_CC, (apply_func_args_t) add_temp_file, 1, return_value);
 	}
 }
+/* }}} */
 
 /* vim: set fdm=marker: */

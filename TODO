@@ -1,11 +1,9 @@
 /**
  * TODO:
- * - Check if the file is actually a directory
- * - Change prep.command to be a formattable string:
- *   - %s: source, %o: original
- *   - error out if %s is not found
+ * - Fix temp stream closing to keep hashtable valid
+ * - Check if the file is actually a directory (?)
  * - Get prep.command order from the suffix (scan EG(ini_directives))
- * - 
+ * 
  * 
  * FIXME:
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
@@ -17,6 +15,9 @@
  * - Allow multiple prep.command INI registrations
  *   - result of one command feeds back into the same tempfile for the next
  *     (if there's > 1)
+ * - Change prep.command to be a formattable string:
+ *   - %s: source, %o: original
+ *   - error out if %s is not found?
  * - Add optional module dependencies on APC, xdebug, xhprof, and whatever else screws
  *   with the compile_file()
  * - Handle shebang (only in CLI):
