@@ -19,8 +19,8 @@ zend_op_array *(*prep_orig_compile_file)(zend_file_handle *file_handle, int type
 /* {{{ Module set-up */
 ZEND_DECLARE_MODULE_GLOBALS(prep)
 
-ZEND_BEGIN_ARG_INFO(prep_get_file, 0)
-	ZEND_ARG_INFO(0, from_file)
+ZEND_BEGIN_ARG_INFO_EX(prep_get_file, 0, 0, 0)
+	ZEND_ARG_INFO(0, orig_file)
 ZEND_END_ARG_INFO()
 
 const zend_function_entry prep_functions[] = {
@@ -229,16 +229,11 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 				php_error_docref(NULL TSRMLS_CC, E_COMPILE_ERROR, "Could not run preprocessor command %s", command);
 			}
 		} else {
-			/* add entry to hashtable */
-			/* XXX
-			if (zend_hash_add(&PREP_G(orig_files), real_path, strlen(real_path),
-							(void*)&output_file, sizeof(char *), NULL) == FAILURE) {
-				failed = 1;
-				goto prep_skip;
-			}
-			*/
-
 			if (output_file) {
+				char *final_output = estrdup(output_file);
+				zend_hash_add(&PREP_G(orig_files), resolved_path, strlen(resolved_path)+1,
+							  (void*)&final_output, sizeof(char *), NULL);
+
 				if (SUCCESS == zend_stream_open_function((const char *)output_file, file_handle TSRMLS_CC)) {
 					file_handle->filename = orig_file_handle.filename;
 					if (file_handle->opened_path) {
@@ -357,24 +352,35 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 }
 /* }}} */
 
+static int add_temp_file(char **ptf TSRMLS_DC, int num_args, va_list args, zend_hash_key *hash_key)
+{
+	zval *map = va_arg(args, zval *);
+
+    if ((hash_key->nKeyLength==0 || hash_key->arKey[0]!=0)) {
+        add_assoc_string_ex(map, hash_key->arKey, hash_key->nKeyLength+1, *ptf, 1);
+    }
+    return ZEND_HASH_APPLY_KEEP;
+}
+
 PHP_FUNCTION(prep_get_file)
 {
-	char *from_file, *pData;
-	int from_file_len;
+	char *orig_file = NULL;
+	int orig_file_len;
+	char **temp;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &from_file, &from_file_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|s", &orig_file, &orig_file_len) == FAILURE) {
 		RETURN_FALSE;
 	}
 
-	if (!zend_hash_exists(&PREP_G(orig_files), from_file, from_file_len)) {
-		RETURN_FALSE;
+	if (orig_file) {
+		if (zend_hash_find(&PREP_G(orig_files), orig_file, orig_file_len+1, (void**)&temp) == FAILURE) {
+			RETURN_FALSE;
+		}
+		RETURN_STRING(*temp, 1);
+	} else {
+		array_init(return_value);
+		zend_hash_apply_with_arguments(&PREP_G(orig_files) TSRMLS_CC, (apply_func_args_t) add_temp_file, 1, return_value);
 	}
-
-	if (zend_hash_find(&PREP_G(orig_files), from_file, from_file_len, (void**)&pData) == FAILURE) {
-		RETURN_FALSE;
-	}
-
-	RETURN_STRING(pData, strlen(pData));
 }
 
 /* vim: set fdm=marker: */

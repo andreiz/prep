@@ -6,6 +6,8 @@
  * - Change prep.command to be a formattable string:
  *   - %s: source, %o: original
  *   - error out if %s is not found
+ * - Get prep.command order from the suffix (scan EG(ini_directives))
+ * - 
  * 
  * FIXME:
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
