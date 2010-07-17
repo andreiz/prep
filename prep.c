@@ -83,9 +83,9 @@ static PHP_INI_MH(OnUpdateCommand)
 }
 
 PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("prep.command", "", PHP_INI_PERDIR, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
-	STD_PHP_INI_ENTRY("prep.command2","", PHP_INI_PERDIR, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
-	STD_PHP_INI_ENTRY("prep.command3","", PHP_INI_PERDIR, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
+	STD_PHP_INI_ENTRY("prep.command", "", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
+	STD_PHP_INI_ENTRY("prep.command2","", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
+	STD_PHP_INI_ENTRY("prep.command3","", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
 PHP_INI_END()
 /* }}} */
 
