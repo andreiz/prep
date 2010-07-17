@@ -64,6 +64,7 @@ ZEND_GET_MODULE(prep)
 static PHP_INI_MH(OnUpdateCommand)
 {
 	HashTable *commands;
+	long index;
 #ifndef ZTS
 	char *base = (char *) mh_arg2;
 #else
@@ -72,20 +73,21 @@ static PHP_INI_MH(OnUpdateCommand)
 	base = (char *) ts_resource(*((int *) mh_arg2));
 #endif
 
-	if (new_value && !new_value[0]) {
+	if (!new_value) {
 		return FAILURE;
 	}
 
 	commands = (HashTable *) (base+(size_t) mh_arg1);
-	zend_hash_next_index_insert(commands, &new_value, sizeof(char *), NULL);
+	index = (long)mh_arg3;
+	zend_hash_index_update(commands, index, &new_value, sizeof(char *), NULL);
 
 	return SUCCESS;
 }
 
 PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("prep.command", "", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
-	STD_PHP_INI_ENTRY("prep.command2","", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
-	STD_PHP_INI_ENTRY("prep.command3","", PHP_INI_ALL, OnUpdateCommand, commands, zend_prep_globals, prep_globals)
+	PHP_INI_ENTRY3("prep.command", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)0)
+	PHP_INI_ENTRY3("prep.command2", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)1)
+	PHP_INI_ENTRY3("prep.command3", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)2)
 PHP_INI_END()
 /* }}} */
 
@@ -128,6 +130,11 @@ static zend_op_array *prep_compile_file(zend_file_handle *file_handle, int type 
 		input_file = php_escape_shell_arg(resolved_path);
 		zend_hash_internal_pointer_reset(commands);
 		while (zend_hash_get_current_data(commands, (void **)&prep_command) == SUCCESS) {
+
+			if (!*prep_command || !(*prep_command)[0]) {
+				zend_hash_move_forward(commands);
+				continue;
+			}
 
 			if (command) {
 				efree(command);

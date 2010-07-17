@@ -1,6 +1,7 @@
 /**
  * TODO:
  * - Fix temp stream closing to keep hashtable valid
+ * - Check if command exists and is executable before opening the pipe
  * - Check if the file is actually a directory (?)
  * - Get prep.command order from the suffix (scan EG(ini_directives))
  * 
