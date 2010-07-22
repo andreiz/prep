@@ -1,0 +1,3 @@
+prep is a PHP extension that hooks into the compilation process and allows you to pre-process the scripts before compilation via any program.
+
+[tbd]

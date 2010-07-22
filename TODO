@@ -3,8 +3,7 @@
  * - Fix temp stream closing to keep hashtable valid
  * - Check if command exists and is executable before opening the pipe
  * - Check if the file is actually a directory (?)
- * - Get prep.command order from the suffix (scan EG(ini_directives))
- * 
+ * - Get prep.command order from the suffix (scan EG(ini_directives)) ?
  * 
  * FIXME:
  * - Add tmpfile handle to PREP_G that gets cleared out on RSHUTDOWN
