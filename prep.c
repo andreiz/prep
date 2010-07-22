@@ -88,6 +88,12 @@ PHP_INI_BEGIN()
     PHP_INI_ENTRY3("prep.command", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)0)
     PHP_INI_ENTRY3("prep.command2", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)1)
     PHP_INI_ENTRY3("prep.command3", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)2)
+    PHP_INI_ENTRY3("prep.command4", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)3)
+    PHP_INI_ENTRY3("prep.command5", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)4)
+    PHP_INI_ENTRY3("prep.command6", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)5)
+    PHP_INI_ENTRY3("prep.command7", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)6)
+    PHP_INI_ENTRY3("prep.command8", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)7)
+    PHP_INI_ENTRY3("prep.command9", "", PHP_INI_ALL, OnUpdateCommand, (void *) XtOffsetOf(zend_prep_globals, commands), (void *)&prep_globals, (void *)8)
 PHP_INI_END()
 /* }}} */
 
@@ -358,6 +364,7 @@ PHP_MINFO_FUNCTION(prep) /* {{{ */
 {
     php_info_print_table_start();
     php_info_print_table_header(2, "prep support", "enabled");
+    php_info_print_table_row(2, "Version", PHP_PREP_VERSION);
     php_info_print_table_end();
     DISPLAY_INI_ENTRIES();
 }
